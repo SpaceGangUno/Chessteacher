@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
 import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu, Sparkles, TrendingUp, Undo2 } from "lucide-react";
@@ -28,6 +28,8 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
   const [showBestMoves, setShowBestMoves] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [highlightedSquares, setHighlightedSquares] = useState<{ [key: string]: { backgroundColor: string } }>({});
+  const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showBestMovesRef = useRef(showBestMoves);
 
   const currentLesson = lesson ? lessons.find(l => l.id === lesson) : null;
 
@@ -163,43 +165,102 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
     return null;
   };
 
+  useEffect(() => {
+    showBestMovesRef.current = showBestMoves;
+  }, [showBestMoves]);
+
+  const runBestMoveAnalysis = useCallback((fen: string) => {
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+    }
+
+    const gameForAnalysis = new Chess(fen);
+
+    if (gameForAnalysis.isGameOver()) {
+      setIsAnalyzing(false);
+      setBestMoves([]);
+      setHighlightedSquares({});
+      analysisTimeoutRef.current = null;
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    analysisTimeoutRef.current = setTimeout(() => {
+      if (!showBestMovesRef.current) {
+        analysisTimeoutRef.current = null;
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const analysis = analyzeBestMoves(new Chess(fen), 3);
+      setBestMoves(analysis);
+
+      if (analysis.length > 0) {
+        const highlightColors = [
+          'rgba(34, 197, 94, 0.5)',
+          'rgba(59, 130, 246, 0.5)',
+          'rgba(168, 85, 247, 0.5)',
+          'rgba(251, 146, 60, 0.4)',
+          'rgba(234, 179, 8, 0.4)',
+        ];
+        const highlights: { [key: string]: { backgroundColor: string } } = {};
+        analysis.forEach((move, index) => {
+          const color = highlightColors[index] || highlightColors[highlightColors.length - 1];
+          highlights[move.to] = { backgroundColor: color };
+        });
+        setHighlightedSquares(highlights);
+      } else {
+        setHighlightedSquares({});
+      }
+
+      setIsAnalyzing(false);
+      analysisTimeoutRef.current = null;
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    if (!showBestMoves) {
+      return;
+    }
+
+    runBestMoveAnalysis(currentPosition);
+
+    return () => {
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current);
+        analysisTimeoutRef.current = null;
+      }
+    };
+  }, [showBestMoves, currentPosition, runBestMoveAnalysis]);
+
+  useEffect(() => {
+    return () => {
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current);
+        analysisTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const analyzeMoves = () => {
     if (game.isGameOver()) {
       setFeedback("Game is over!");
       return;
     }
 
-    setIsAnalyzing(true);
     setShowBestMoves(true);
-    
-    setTimeout(() => {
-      const analysis = analyzeBestMoves(game, 3);
-      setBestMoves(analysis);
-      
-      // Highlight best move squares
-      if (analysis.length > 0) {
-        const highlights: { [key: string]: { backgroundColor: string } } = {};
-        analysis.forEach((move, index) => {
-          const colors = [
-            'rgba(34, 197, 94, 0.5)',    // Green for best
-            'rgba(59, 130, 246, 0.5)',   // Blue for second
-            'rgba(168, 85, 247, 0.5)',   // Purple for third
-            'rgba(251, 146, 60, 0.4)',   // Orange for fourth
-            'rgba(234, 179, 8, 0.4)',    // Yellow for fifth
-          ];
-          highlights[move.to] = { backgroundColor: colors[index] };
-        });
-        setHighlightedSquares(highlights);
-      }
-      
-      setIsAnalyzing(false);
-    }, 300);
   };
 
   const closeBestMoves = () => {
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
     setShowBestMoves(false);
     setBestMoves([]);
     setHighlightedSquares({});
+    setIsAnalyzing(false);
   };
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
@@ -501,5 +562,4 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
     </div>
   );
 }
-
 
