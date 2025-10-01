@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
-import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight } from "lucide-react";
+import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu } from "lucide-react";
 import { lessons } from "@/data/lessons";
+import { getBestMove, getDifficultyDescription } from "@/utils/chessAI";
 
 interface ChessBoardProps {
   lesson: string | null;
@@ -21,6 +22,8 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
   const [lessonStep, setLessonStep] = useState(0);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
   const [isLessonComplete, setIsLessonComplete] = useState(false);
+  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert'>('medium');
+  const [isAiThinking, setIsAiThinking] = useState(false);
 
   const currentLesson = lesson ? lessons.find(l => l.id === lesson) : null;
 
@@ -66,40 +69,63 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [currentLesson, isLessonComplete, lessonStep, onMoveUpdate]);
 
-  // Auto-play opponent moves
+  // Auto-play opponent moves (lessons) or AI moves (free play)
   useEffect(() => {
-    if (!currentLesson?.steps || !currentLesson.steps[lessonStep]) return;
+    // Lesson mode: play predefined opponent moves
+    if (currentLesson?.steps && currentLesson.steps[lessonStep]) {
+      const currentStep = currentLesson.steps[lessonStep];
+      const isPlayerTurn = game.turn() === playerColor;
+      
+      if (!isPlayerTurn) {
+        const timer = setTimeout(() => {
+          try {
+            const gameCopy = new Chess(game.fen());
+            const move = gameCopy.move(currentStep.move);
+            
+            if (move) {
+              setGame(gameCopy);
+              setCurrentPosition(gameCopy.fen());
+              onMoveUpdate(gameCopy.history());
+              
+              setTimeout(() => {
+                if (lessonStep < currentLesson.steps.length - 1) {
+                  setLessonStep(prev => prev + 1);
+                }
+              }, 500);
+            }
+          } catch (error) {
+            console.error("Error playing opponent move:", error);
+          }
+        }, 800);
+        
+        return () => clearTimeout(timer);
+      }
+    }
     
-    const currentStep = currentLesson.steps[lessonStep];
-    const isPlayerTurn = game.turn() === playerColor;
-    
-    // If it's the opponent's turn and there's a predefined move
-    if (!isPlayerTurn) {
+    // Free play mode: AI makes moves
+    if (!currentLesson && game.turn() === 'b' && !game.isGameOver()) {
+      setIsAiThinking(true);
       const timer = setTimeout(() => {
         try {
           const gameCopy = new Chess(game.fen());
-          const move = gameCopy.move(currentStep.move);
+          const aiMove = getBestMove(gameCopy, aiDifficulty);
           
-          if (move) {
+          if (aiMove) {
+            gameCopy.move(aiMove);
             setGame(gameCopy);
             setCurrentPosition(gameCopy.fen());
             onMoveUpdate(gameCopy.history());
-            
-            // Move to next step
-            setTimeout(() => {
-              if (lessonStep < currentLesson.steps.length - 1) {
-                setLessonStep(prev => prev + 1);
-              }
-            }, 500);
           }
+          setIsAiThinking(false);
         } catch (error) {
-          console.error("Error playing opponent move:", error);
+          console.error("Error making AI move:", error);
+          setIsAiThinking(false);
         }
-      }, 800);
+      }, 600);
       
       return () => clearTimeout(timer);
     }
-  }, [lessonStep, game, currentLesson, playerColor, onMoveUpdate]);
+  }, [lessonStep, game, currentLesson, playerColor, onMoveUpdate, aiDifficulty]);
 
   const resetBoard = () => {
     const newGame = new Chess();
@@ -221,10 +247,32 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
         ) : (
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4">
             <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-lg">Free Play Mode</h3>
-                <p className="text-sm text-green-100 mt-1">Practice freely or select a lesson from the left panel to begin structured learning</p>
+              <Cpu className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">Free Play Mode - vs Computer</h3>
+                <p className="text-sm text-green-100 mt-1">Play against AI or select a lesson from the left panel</p>
+                
+                {/* AI Difficulty Slider */}
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">AI Difficulty: {aiDifficulty.charAt(0).toUpperCase() + aiDifficulty.slice(1)}</label>
+                    {isAiThinking && (
+                      <span className="text-xs bg-white/20 px-2 py-1 rounded-full animate-pulse">AI thinking...</span>
+                    )}
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3"
+                    value={aiDifficulty === 'easy' ? 0 : aiDifficulty === 'medium' ? 1 : aiDifficulty === 'hard' ? 2 : 3}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      setAiDifficulty(value === 0 ? 'easy' : value === 1 ? 'medium' : value === 2 ? 'hard' : 'expert');
+                    }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                  />
+                  <p className="text-xs text-green-100">{getDifficultyDescription(aiDifficulty)}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -232,21 +280,25 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
 
         {/* Chess board */}
         <div className="p-4 md:p-6">
-          {currentLesson && (
+          {(currentLesson || !currentLesson) && (
             <div className="mb-3 flex items-center justify-center gap-2 text-sm">
-              <div className={`px-3 py-1 rounded-full ${game.turn() === playerColor ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                Your Turn {game.turn() === 'w' ? '♔' : '♚'}
+              <div className={`px-3 py-1 rounded-full ${game.turn() === 'w' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                You (White) ♔
               </div>
-              <div className={`px-3 py-1 rounded-full ${game.turn() !== playerColor ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                Opponent {game.turn() === 'w' ? '♚' : '♔'}
+              <div className={`px-3 py-1 rounded-full ${game.turn() === 'b' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                {currentLesson ? 'Opponent' : 'AI'} (Black) ♚
               </div>
             </div>
           )}
           <Chessboard
             position={currentPosition}
             onPieceDrop={onDrop}
-            arePiecesDraggable={!currentLesson || game.turn() === playerColor}
-            boardOrientation={playerColor === 'w' ? 'white' : 'black'}
+            arePiecesDraggable={
+              currentLesson 
+                ? game.turn() === playerColor  // In lesson mode, only player's turn
+                : game.turn() === 'w' && !isAiThinking  // In free play, only white's turn when AI isn't thinking
+            }
+            boardOrientation="white"
             customBoardStyle={{
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
