@@ -291,75 +291,91 @@ export function analyzeBestMoves(game: Chess, depth: number = 3): MoveAnalysis[]
       technique = 'Pawn Promotion';
       reason = `Promotes pawn to Queen - massive material gain and positional advantage.`;
     }
-    // Check for tactical patterns
-    else if (isForkMove(game, move)) {
-      evaluation = 'Excellent';
-      technique = 'Fork';
-      reason = `Creates a fork - attacking multiple pieces simultaneously. The opponent cannot defend both.`;
-    }
-    else if (isPinMove(game, move)) {
-      evaluation = 'Very Good';
-      technique = 'Pin';
-      reason = `Creates a pin - immobilizing an opponent's piece that cannot move without exposing a more valuable piece.`;
-    }
-    else if (isSkewerMove(game, move)) {
-      evaluation = 'Very Good';
-      technique = 'Skewer';
-      reason = `Creates a skewer - attacking a valuable piece that must move, exposing a less valuable piece behind it.`;
-    }
-    else if (isDiscoveredAttack(game, move)) {
-      evaluation = 'Very Good';
-      technique = 'Discovered Attack';
-      reason = `Creates a discovered attack - moving one piece reveals an attack from another piece.`;
-    }
-    else if (isDeflectionMove(game, move)) {
-      evaluation = 'Good';
-      technique = 'Deflection';
-      reason = `Deflects an opponent's piece from defending a key square or piece.`;
-    }
-    else if (isDecoyMove(game, move)) {
-      evaluation = 'Good';
-      technique = 'Decoy';
-      reason = `Decoys an opponent's piece to an unfavorable square.`;
-    }
-    // Positional moves
-    else if (isCenterControlMove(game, move)) {
-      evaluation = 'Good';
-      technique = 'Center Control';
-      reason = `Controls central squares - fundamental principle for piece activity and space.`;
-    }
-    else if (isDevelopmentMove(game, move)) {
-      evaluation = 'Good';
-      technique = 'Piece Development';
-      reason = `Develops a piece toward the center - improves piece activity and follows opening principles.`;
-    }
-    else if (isKingSafetyMove(game, move)) {
-      evaluation = 'Good';
-      technique = 'King Safety';
-      reason = `Improves king safety - essential for avoiding tactical threats.`;
-    }
-    else if (isPawnStructureMove(game, move)) {
-      evaluation = 'Decent';
-      technique = 'Pawn Structure';
-      reason = `Improves pawn structure - creates long-term positional advantages.`;
-    }
+    // Check for tactical patterns with detailed analysis
     else {
-      // Generic evaluation based on score
-      if (absScore > 900) {
+      const forkResult = isForkMove(game, move);
+      if (forkResult.isFork) {
         evaluation = 'Excellent';
-        reason = 'Strong attacking move with significant positional advantages.';
-      } else if (absScore > 500) {
-        evaluation = 'Very Good';
-        reason = 'Good positional move that improves the position.';
-      } else if (absScore > 200) {
-        evaluation = 'Good';
-        reason = 'Solid move that maintains or slightly improves the position.';
-      } else if (absScore > 0) {
-        evaluation = 'Decent';
-        reason = 'Safe move that maintains balance.';
+        technique = 'Fork';
+        reason = forkResult.details;
       } else {
-        evaluation = 'Neutral';
-        reason = 'Standard move with no significant advantage or disadvantage.';
+        const pinResult = isPinMove(game, move);
+        if (pinResult.isPin) {
+          evaluation = 'Very Good';
+          technique = 'Pin';
+          reason = pinResult.details;
+        } else {
+          const skewerResult = isSkewerMove(game, move);
+          if (skewerResult.isSkewer) {
+            evaluation = 'Very Good';
+            technique = 'Skewer';
+            reason = skewerResult.details;
+          } else {
+            const discoveredResult = isDiscoveredAttack(game, move);
+            if (discoveredResult.isDiscovered) {
+              evaluation = 'Very Good';
+              technique = 'Discovered Attack';
+              reason = discoveredResult.details;
+            } else {
+              const deflectionResult = isDeflectionMove(game, move);
+              if (deflectionResult.isDeflection) {
+                evaluation = 'Good';
+                technique = 'Deflection';
+                reason = deflectionResult.details;
+              } else {
+                const decoyResult = isDecoyMove(game, move);
+                if (decoyResult.isDecoy) {
+                  evaluation = 'Good';
+                  technique = 'Decoy';
+                  reason = decoyResult.details;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // If no tactical pattern was found, check for positional moves
+    if (!technique) {
+      if (isCenterControlMove(game, move)) {
+        evaluation = 'Good';
+        technique = 'Center Control';
+        reason = `Controls central squares - fundamental principle for piece activity and space.`;
+      }
+      else if (isDevelopmentMove(game, move)) {
+        evaluation = 'Good';
+        technique = 'Piece Development';
+        reason = `Develops a piece toward the center - improves piece activity and follows opening principles.`;
+      }
+      else if (isKingSafetyMove(game, move)) {
+        evaluation = 'Good';
+        technique = 'King Safety';
+        reason = `Improves king safety - essential for avoiding tactical threats.`;
+      }
+      else if (isPawnStructureMove(game, move)) {
+        evaluation = 'Decent';
+        technique = 'Pawn Structure';
+        reason = `Improves pawn structure - creates long-term positional advantages.`;
+      }
+      else {
+        // Generic evaluation based on score
+        if (absScore > 900) {
+          evaluation = 'Excellent';
+          reason = 'Strong attacking move with significant positional advantages.';
+        } else if (absScore > 500) {
+          evaluation = 'Very Good';
+          reason = 'Good positional move that improves the position.';
+        } else if (absScore > 200) {
+          evaluation = 'Good';
+          reason = 'Solid move that maintains or slightly improves the position.';
+        } else if (absScore > 0) {
+          evaluation = 'Decent';
+          reason = 'Safe move that maintains balance.';
+        } else {
+          evaluation = 'Neutral';
+          reason = 'Standard move with no significant advantage or disadvantage.';
+        }
       }
     }
 
@@ -394,36 +410,66 @@ function getPieceName(pieceType: string): string {
   return names[pieceType] || 'piece';
 }
 
-// Technique detection functions
-function isForkMove(game: Chess, move: any): boolean {
+// Enhanced technique detection with detailed piece information
+function isForkMove(game: Chess, move: any): { isFork: boolean; attackedPieces: string[]; details: string } {
   const gameCopy = new Chess(game.fen());
   gameCopy.move(move.san);
   
-  // Check if the moved piece attacks multiple enemy pieces
-  const attacks = [];
+  const attackedPieces = [];
   const board = gameCopy.board();
+  const pieceName = getPieceName(move.piece);
   
+  // Check which pieces are attacked by the moved piece specifically
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 8; j++) {
       const square = board[i][j];
       if (square && square.color !== gameCopy.turn()) {
         const squareName = String.fromCharCode(97 + j) + (8 - i);
+        // Check if this specific piece is attacked by the moved piece
         if (gameCopy.isAttacked(squareName, gameCopy.turn())) {
-          attacks.push(square);
+          // Verify the attack comes from the piece we just moved
+          const attackers = gameCopy.moves({ square: squareName, verbose: true })
+            .filter(m => m.from === move.to);
+          if (attackers.length > 0) {
+            attackedPieces.push(`${getPieceName(square.type)} on ${squareName}`);
+          }
         }
       }
     }
   }
   
-  return attacks.length >= 2;
+  let details = '';
+  if (attackedPieces.length >= 2) {
+    details = `The ${pieceName} on ${move.to} attacks ${attackedPieces.join(' and ')}. `;
+    details += `The opponent cannot defend both pieces simultaneously. `;
+    
+    if (attackedPieces.some(p => p.includes('King'))) {
+      details += `Since the king is attacked, it must move, allowing you to capture the other piece.`;
+    } else {
+      // Sort by piece value for better explanation
+      const sortedPieces = attackedPieces.sort((a, b) => {
+        const aType = a.split(' ')[0].toLowerCase();
+        const bType = b.split(' ')[0].toLowerCase();
+        return (pieceValues[bType] || 0) - (pieceValues[aType] || 0);
+      });
+      details += `The opponent will likely save the ${sortedPieces[0]}, allowing you to capture the ${sortedPieces[1]}.`;
+    }
+  }
+  
+  return {
+    isFork: attackedPieces.length >= 2,
+    attackedPieces,
+    details
+  };
 }
 
-function isPinMove(game: Chess, move: any): boolean {
+function isPinMove(game: Chess, move: any): { isPin: boolean; pinnedPiece: string; details: string } {
   const gameCopy = new Chess(game.fen());
   gameCopy.move(move.san);
   
-  // Check if any enemy piece is pinned
   const board = gameCopy.board();
+  let pinnedPiece = '';
+  let details = '';
   
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 8; j++) {
@@ -432,48 +478,190 @@ function isPinMove(game: Chess, move: any): boolean {
         const squareName = String.fromCharCode(97 + j) + (8 - i);
         const moves = gameCopy.moves({ square: squareName, verbose: true });
         
-        // If piece has limited moves, it might be pinned
-        if (moves.length < 3) {
-          return true;
+        // Check if piece has very limited moves (indicating a pin)
+        if (moves.length <= 2) {
+          pinnedPiece = `${getPieceName(square.type)} on ${squareName}`;
+          const pieceName = getPieceName(move.piece);
+          
+          // Find what piece is behind the pinned piece
+          const direction = getDirection(move.from, move.to);
+          const behindPiece = findPieceBehind(gameCopy, squareName, direction, gameCopy.turn());
+          
+          if (behindPiece) {
+            details = `The ${pieceName} on ${move.to} pins the ${pinnedPiece}. `;
+            details += `This piece cannot move without exposing the ${behindPiece} behind it. `;
+            details += `The pinned piece is essentially immobilized and vulnerable to further attacks.`;
+          } else {
+            details = `The ${pieceName} on ${move.to} pins the ${pinnedPiece}. `;
+            details += `This piece cannot move without exposing a more valuable piece behind it. `;
+            details += `The pinned piece is essentially immobilized and vulnerable to further attacks.`;
+          }
+          break;
         }
       }
     }
   }
   
-  return false;
+  return {
+    isPin: pinnedPiece !== '',
+    pinnedPiece,
+    details
+  };
 }
 
-function isSkewerMove(game: Chess, move: any): boolean {
-  // Similar to pin but attacking a more valuable piece first
-  return isPinMove(game, move);
+// Helper function to get direction between two squares
+function getDirection(from: string, to: string): string {
+  const fromFile = from.charCodeAt(0) - 97;
+  const fromRank = parseInt(from[1]) - 1;
+  const toFile = to.charCodeAt(0) - 97;
+  const toRank = parseInt(to[1]) - 1;
+  
+  const fileDiff = toFile - fromFile;
+  const rankDiff = toRank - fromRank;
+  
+  if (fileDiff === 0) {
+    return rankDiff > 0 ? 'up' : 'down';
+  } else if (rankDiff === 0) {
+    return fileDiff > 0 ? 'right' : 'left';
+  } else if (Math.abs(fileDiff) === Math.abs(rankDiff)) {
+    if (fileDiff > 0 && rankDiff > 0) return 'up-right';
+    if (fileDiff > 0 && rankDiff < 0) return 'down-right';
+    if (fileDiff < 0 && rankDiff > 0) return 'up-left';
+    if (fileDiff < 0 && rankDiff < 0) return 'down-left';
+  }
+  
+  return '';
 }
 
-function isDiscoveredAttack(game: Chess, move: any): boolean {
+// Helper function to find piece behind a pinned piece
+function findPieceBehind(game: Chess, pinnedSquare: string, direction: string, attackerColor: 'w' | 'b'): string {
+  const board = game.board();
+  const file = pinnedSquare.charCodeAt(0) - 97;
+  const rank = parseInt(pinnedSquare[1]) - 1;
+  
+  let stepFile = 0;
+  let stepRank = 0;
+  
+  switch (direction) {
+    case 'up': stepRank = 1; break;
+    case 'down': stepRank = -1; break;
+    case 'right': stepFile = 1; break;
+    case 'left': stepFile = -1; break;
+    case 'up-right': stepFile = 1; stepRank = 1; break;
+    case 'up-left': stepFile = -1; stepRank = 1; break;
+    case 'down-right': stepFile = 1; stepRank = -1; break;
+    case 'down-left': stepFile = -1; stepRank = -1; break;
+    default: return '';
+  }
+  
+  // Look in the opposite direction from the attacker
+  let checkFile = file - stepFile;
+  let checkRank = rank - stepRank;
+  
+  while (checkFile >= 0 && checkFile < 8 && checkRank >= 0 && checkRank < 8) {
+    const square = board[7 - checkRank][checkFile];
+    if (square) {
+      if (square.color !== attackerColor) {
+        return `${getPieceName(square.type)} on ${String.fromCharCode(97 + checkFile)}${checkRank + 1}`;
+      }
+      break; // Found a piece, stop looking
+    }
+    checkFile -= stepFile;
+    checkRank -= stepRank;
+  }
+  
+  return '';
+}
+
+function isSkewerMove(game: Chess, move: any): { isSkewer: boolean; skeweredPieces: string[]; details: string } {
+  const forkResult = isForkMove(game, move);
+  return {
+    isSkewer: forkResult.isFork,
+    skeweredPieces: forkResult.attackedPieces,
+    details: forkResult.details.replace('attacks', 'skewers').replace('fork', 'skewer')
+  };
+}
+
+function isDiscoveredAttack(game: Chess, move: any): { isDiscovered: boolean; discoveredAttacks: string[]; details: string } {
   const gameCopy = new Chess(game.fen());
   const beforeMoves = gameCopy.moves({ verbose: true });
   gameCopy.move(move.san);
   const afterMoves = gameCopy.moves({ verbose: true });
   
-  // Check if new attacks appeared after the move
-  return afterMoves.some(move => 
-    !beforeMoves.some(beforeMove => 
-      beforeMove.from === move.from && beforeMove.to === move.to
-    )
-  );
+  const discoveredAttacks = [];
+  const pieceName = getPieceName(move.piece);
+  
+  // Find new attacks that appeared after the move
+  for (const afterMove of afterMoves) {
+    const wasAttackingBefore = beforeMoves.some(beforeMove => 
+      beforeMove.from === afterMove.from && beforeMove.to === afterMove.to
+    );
+    
+    if (!wasAttackingBefore && afterMove.from !== move.from) {
+      const targetSquare = gameCopy.board()[8 - parseInt(afterMove.to[1])][afterMove.to.charCodeAt(0) - 97];
+      if (targetSquare) {
+        discoveredAttacks.push(`${getPieceName(targetSquare.type)} on ${afterMove.to}`);
+      }
+    }
+  }
+  
+  let details = '';
+  if (discoveredAttacks.length > 0) {
+    details = `Moving the ${pieceName} from ${move.from} to ${move.to} reveals a discovered attack. `;
+    details += `The piece that was behind it now attacks ${discoveredAttacks.join(' and ')}. `;
+    details += `This creates a double threat - the moved piece has its own threat, while revealing another attack.`;
+  }
+  
+  return {
+    isDiscovered: discoveredAttacks.length > 0,
+    discoveredAttacks,
+    details
+  };
 }
 
-function isDeflectionMove(game: Chess, move: any): boolean {
-  // Check if move forces opponent to abandon defense
+function isDeflectionMove(game: Chess, move: any): { isDeflection: boolean; deflectedPiece: string; details: string } {
   const gameCopy = new Chess(game.fen());
   gameCopy.move(move.san);
   
-  // This is a simplified check - in practice, deflection detection is complex
-  return gameCopy.isCheck() || move.captured;
+  let deflectedPiece = '';
+  let details = '';
+  
+  if (gameCopy.isCheck()) {
+    deflectedPiece = 'King';
+    const pieceName = getPieceName(move.piece);
+    details = `The ${pieceName} move to ${move.to} puts the king in check, forcing it to move. `;
+    details += `This deflection removes the king from defending other pieces, creating tactical opportunities.`;
+  } else if (move.captured) {
+    const pieceName = getPieceName(move.piece);
+    const capturedPiece = getPieceName(move.captured);
+    details = `The ${pieceName} captures the ${capturedPiece} on ${move.to}, forcing the opponent to recapture. `;
+    details += `This deflection removes a defending piece, potentially exposing other targets.`;
+  }
+  
+  return {
+    isDeflection: deflectedPiece !== '',
+    deflectedPiece,
+    details
+  };
 }
 
-function isDecoyMove(game: Chess, move: any): boolean {
-  // Check if move lures opponent piece to unfavorable square
-  return move.captured && pieceValues[move.captured] > pieceValues[move.piece];
+function isDecoyMove(game: Chess, move: any): { isDecoy: boolean; decoyedPiece: string; details: string } {
+  let decoyedPiece = '';
+  let details = '';
+  
+  if (move.captured && pieceValues[move.captured] > pieceValues[move.piece]) {
+    const pieceName = getPieceName(move.piece);
+    const capturedPiece = getPieceName(move.captured);
+    decoyedPiece = capturedPiece;
+    details = `The ${pieceName} sacrifices itself to capture the more valuable ${capturedPiece} on ${move.to}. `;
+    details += `This decoy move lures the opponent into a material disadvantage or tactical trap.`;
+  }
+  
+  return {
+    isDecoy: decoyedPiece !== '',
+    decoyedPiece,
+    details
+  };
 }
 
 function isCenterControlMove(game: Chess, move: any): boolean {

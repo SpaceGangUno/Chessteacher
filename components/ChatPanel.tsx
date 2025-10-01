@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Send, Volume2, VolumeX, Mic, MicOff } from "lucide-react";
+import { MessageCircle, Send, Volume2, VolumeX, Mic, MicOff, Play, Pause, Square } from "lucide-react";
 
 interface Message {
   id: string;
@@ -26,8 +26,13 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
   const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentVoice, setCurrentVoice] = useState<any>(null);
+  const [availableVoices, setAvailableVoices] = useState<any[]>([]);
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const speechSynthesisRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,7 +42,7 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize speech recognition
+  // Initialize speech recognition and find best voice
   useEffect(() => {
     if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
       recognitionRef.current = new (window as any).webkitSpeechRecognition();
@@ -55,20 +60,89 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
         setIsListening(false);
       };
     }
+
+    // Find the best available voice
+    if ('speechSynthesis' in window) {
+      const voices = speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+      
+      // Prefer voices that sound more natural
+      const preferredVoices = voices.filter(voice => 
+        voice.lang.startsWith('en') && 
+        (voice.name.includes('Google') || 
+         voice.name.includes('Microsoft') || 
+         voice.name.includes('Alex') ||
+         voice.name.includes('Samantha') ||
+         voice.name.includes('Daniel') ||
+         voice.name.includes('Karen') ||
+         voice.name.includes('Zira') ||
+         voice.name.includes('David'))
+      );
+      
+      if (preferredVoices.length > 0) {
+        setCurrentVoice(preferredVoices[0]);
+      } else if (voices.length > 0) {
+        setCurrentVoice(voices[0]);
+      }
+    }
   }, []);
 
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {
+      // Stop any current speech
+      speechSynthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.8;
-      utterance.pitch = 1;
-      utterance.volume = 0.8;
       
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
+      // Use the best available voice
+      if (currentVoice) {
+        utterance.voice = currentVoice;
+      }
       
+      // More natural speech settings
+      utterance.rate = 0.85;  // Slightly slower for better comprehension
+      utterance.pitch = 1.0;  // Normal pitch
+      utterance.volume = 0.9;  // High volume
+      
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+      };
+      
+      utterance.onpause = () => {
+        setIsPaused(true);
+      };
+      
+      utterance.onresume = () => {
+        setIsPaused(false);
+      };
+      
+      speechSynthesisRef.current = utterance;
       speechSynthesis.speak(utterance);
     }
+  };
+
+  const pauseSpeech = () => {
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+    }
+  };
+
+  const resumeSpeech = () => {
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+    }
+  };
+
+  const stopSpeech = () => {
+    speechSynthesis.cancel();
+    setIsSpeaking(false);
+    setIsPaused(false);
   };
 
   const startListening = () => {
@@ -93,9 +167,21 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
       return "Great question! Openings are the first 10-15 moves of a chess game. Key principles include: 1) Control the center with pawns, 2) Develop your knights and bishops, 3) Castle early for king safety, 4) Don't move the same piece twice in the opening, and 5) Don't bring out the queen too early. Popular openings include the Italian Game, Spanish Opening, and Sicilian Defense.";
     }
     
-    // Tactics questions
-    if (message.includes('tactic') || message.includes('fork') || message.includes('pin')) {
-      return "Tactics are short-term combinations that win material or deliver checkmate. Common tactics include: Forks (attacking two pieces at once), Pins (immobilizing a piece), Skewers (attacking a valuable piece to expose a less valuable one), and Discovered attacks. Practice tactics daily to improve your tactical vision!";
+    // Specific tactic questions
+    if (message.includes('fork')) {
+      return "A **fork** is when one piece attacks two or more enemy pieces at the same time. The opponent cannot defend both pieces, so you're guaranteed to win material.\n\n**How to create forks:**\n- Knights are excellent forking pieces (they attack in an L-shape)\n- Look for pieces on the same color squares\n- Target the king + another piece for maximum effect\n\n**Example**: Knight on f7 attacks both the king on g8 and queen on d8. The king must move, allowing you to capture the queen!\n\n**How to defend**: Always be aware of potential fork squares and avoid putting pieces on the same color squares.";
+    }
+    
+    if (message.includes('pin')) {
+      return "A **pin** occurs when a piece is attacked but cannot move because it would expose a more valuable piece behind it.\n\n**Types of pins:**\n- **Absolute pin**: Piece cannot move at all (king behind it)\n- **Relative pin**: Piece can move but shouldn't (more valuable piece behind it)\n\n**How to create pins:**\n- Use bishops, rooks, and queens on long diagonals/files\n- Look for enemy pieces in front of their king or valuable pieces\n\n**Example**: Bishop on g5 pins knight on f6 to the king on g8. The knight cannot move!\n\n**How to defend**: Break the pin by moving the piece behind, blocking with another piece, or capturing the attacking piece.";
+    }
+    
+    if (message.includes('skewer')) {
+      return "A **skewer** is like a pin in reverse - you attack the more valuable piece first, forcing it to move and exposing a less valuable piece behind it.\n\n**How skewers work:**\n- Attack a valuable piece (like king or queen)\n- Force it to move\n- Capture the less valuable piece that was behind it\n\n**Example**: Rook attacks queen on d1, queen moves, rook captures rook on d8.\n\n**How to create**: Look for enemy pieces lined up on the same diagonal, file, or rank.\n\n**How to defend**: Avoid lining up pieces, especially with the king or queen in front.";
+    }
+    
+    if (message.includes('discovered attack') || message.includes('discovered')) {
+      return "A **discovered attack** happens when you move one piece and reveal an attack from another piece behind it.\n\n**How it works:**\n- Move a piece that was blocking another piece\n- The piece behind now attacks an enemy target\n- You get two threats for the price of one move\n\n**Example**: Move knight from e5, revealing bishop on c3 that now attacks queen on f6.\n\n**Types:**\n- **Discovered check**: Moving piece reveals check\n- **Discovered attack**: Moving piece reveals attack on another piece\n\n**How to create**: Look for pieces that are blocking other pieces' lines of attack.\n\n**How to defend**: Be aware of pieces that could move and reveal attacks.";
     }
     
     // Endgame questions
@@ -169,6 +255,32 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
             <h3 className="font-semibold text-lg">Chess Teacher Chat</h3>
           </div>
           <div className="flex items-center gap-2">
+            {/* Speech Controls */}
+            {isSpeaking && (
+              <>
+                <button
+                  onClick={isPaused ? resumeSpeech : pauseSpeech}
+                  className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                  title={isPaused ? "Resume speaking" : "Pause speaking"}
+                >
+                  {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={stopSpeech}
+                  className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                  title="Stop speaking"
+                >
+                  <Square className="w-4 h-4" />
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowVoiceSelector(!showVoiceSelector)}
+              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              title="Select voice"
+            >
+              <span className="text-xs font-medium">🎤</span>
+            </button>
             <button
               onClick={() => setIsSpeaking(!isSpeaking)}
               className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
@@ -178,7 +290,42 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
             </button>
           </div>
         </div>
-        <p className="text-sm text-blue-100 mt-1">Ask me anything about chess!</p>
+        <p className="text-sm text-blue-100 mt-1">
+          Ask me anything about chess! 
+          {currentVoice && (
+            <span className="ml-2 text-xs opacity-75">
+              Voice: {currentVoice.name}
+            </span>
+          )}
+        </p>
+        
+        {/* Voice Selector */}
+        {showVoiceSelector && (
+          <div className="mt-3 p-3 bg-white/10 rounded-lg">
+            <label className="text-xs text-blue-100 mb-2 block">Select Voice:</label>
+            <select
+              value={currentVoice?.name || ''}
+              onChange={(e) => {
+                const selectedVoice = availableVoices.find(v => v.name === e.target.value);
+                setCurrentVoice(selectedVoice);
+                setShowVoiceSelector(false);
+              }}
+              className="w-full p-2 text-xs bg-white/20 text-white rounded border-0 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
+              {availableVoices.filter(voice => voice.lang.startsWith('en')).map((voice) => (
+                <option key={voice.name} value={voice.name} className="text-black">
+                  {voice.name} ({voice.lang})
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowVoiceSelector(false)}
+              className="mt-2 text-xs text-blue-200 hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -204,7 +351,7 @@ export default function ChatPanel({ onSpeak }: ChatPanelProps) {
                   <button
                     onClick={() => speak(message.text)}
                     className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors"
-                    title="Read aloud"
+                    title="Read aloud with natural voice"
                   >
                     <Volume2 className="w-3 h-3" />
                   </button>
