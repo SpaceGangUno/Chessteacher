@@ -7,10 +7,6 @@ import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu, Sparkles, Tr
 import { lessons } from "@/data/lessons";
 import { getBestMove, getDifficultyDescription, analyzeBestMoves, type MoveAnalysis } from "@/utils/chessAI";
 
-// Debug: Log imports
-console.log('Chessboard import:', Chessboard);
-console.log('Chess import:', Chess);
-
 interface ChessBoardProps {
   lesson: string | null;
   onMoveUpdate: (moves: string[]) => void;
@@ -399,7 +395,6 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
             </div>
           )}
           <div className="w-full aspect-square max-w-lg mx-auto">
-            {console.log('Rendering chessboard with position:', currentPosition)}
             <Chessboard
               position={currentPosition}
               onPieceDrop={onDrop}
@@ -537,6 +532,11 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
                         <span className={`text-xs px-2 py-0.5 rounded-full ${color.badge} text-white font-medium`}>
                           {move.evaluation}
                         </span>
+                        {move.technique && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full bg-slate-600 text-white font-medium`}>
+                            {move.technique}
+                          </span>
+                        )}
                       </div>
                       <p className={`text-sm ${color.text}`}>{move.reason}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">

@@ -5,6 +5,7 @@ import ChessBoard from "@/components/ChessBoard";
 import LessonPanel from "@/components/LessonPanel";
 import Header from "@/components/Header";
 import MoveHistory from "@/components/MoveHistory";
+import ChatPanel from "@/components/ChatPanel";
 
 export default function Home() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
@@ -35,9 +36,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Panel - Move History & Analysis */}
-          <div className="lg:col-span-3">
+          {/* Right Panel - Move History & Chat */}
+          <div className="lg:col-span-3 space-y-6">
             <MoveHistory moves={moveHistory} />
+            <ChatPanel />
           </div>
         </div>
       </main>
