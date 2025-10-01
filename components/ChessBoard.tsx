@@ -7,6 +7,10 @@ import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu, Sparkles, Tr
 import { lessons } from "@/data/lessons";
 import { getBestMove, getDifficultyDescription, analyzeBestMoves, type MoveAnalysis } from "@/utils/chessAI";
 
+// Debug: Log imports
+console.log('Chessboard import:', Chessboard);
+console.log('Chess import:', Chess);
+
 interface ChessBoardProps {
   lesson: string | null;
   onMoveUpdate: (moves: string[]) => void;
@@ -394,23 +398,28 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
               </div>
             </div>
           )}
-          <Chessboard
-            position={currentPosition}
-            onPieceDrop={onDrop}
-            arePiecesDraggable={
-              currentLesson 
-                ? game.turn() === playerColor  // In lesson mode, only player's turn
-                : game.turn() === 'w' && !isAiThinking  // In free play, only white's turn when AI isn't thinking
-            }
-            boardOrientation="white"
-            customBoardStyle={{
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            }}
-            customDarkSquareStyle={{ backgroundColor: '#6366f1' }}
-            customLightSquareStyle={{ backgroundColor: '#e0e7ff' }}
-            customSquareStyles={highlightedSquares}
-          />
+          <div className="w-full aspect-square max-w-lg mx-auto">
+            {console.log('Rendering chessboard with position:', currentPosition)}
+            <Chessboard
+              position={currentPosition}
+              onPieceDrop={onDrop}
+              arePiecesDraggable={
+                currentLesson 
+                  ? game.turn() === playerColor  // In lesson mode, only player's turn
+                  : game.turn() === 'w' && !isAiThinking  // In free play, only white's turn when AI isn't thinking
+              }
+              boardOrientation="white"
+              customBoardStyle={{
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                width: '100%',
+                height: '100%',
+              }}
+              customDarkSquareStyle={{ backgroundColor: '#6366f1' }}
+              customLightSquareStyle={{ backgroundColor: '#e0e7ff' }}
+              customSquareStyles={highlightedSquares}
+            />
+          </div>
         </div>
 
         {/* Feedback/Hint section */}
