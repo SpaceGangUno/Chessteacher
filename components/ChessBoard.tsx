@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Chessboard } from "react-chessboard";
 import { Chess } from "chess.js";
-import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu } from "lucide-react";
+import { RotateCcw, Info, Lightbulb, CheckCircle2, ArrowRight, Cpu, Sparkles, TrendingUp, Undo2 } from "lucide-react";
 import { lessons } from "@/data/lessons";
-import { getBestMove, getDifficultyDescription } from "@/utils/chessAI";
+import { getBestMove, getDifficultyDescription, analyzeBestMoves, type MoveAnalysis } from "@/utils/chessAI";
 
 interface ChessBoardProps {
   lesson: string | null;
@@ -24,6 +24,10 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
   const [isLessonComplete, setIsLessonComplete] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert'>('medium');
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [bestMoves, setBestMoves] = useState<MoveAnalysis[]>([]);
+  const [showBestMoves, setShowBestMoves] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [highlightedSquares, setHighlightedSquares] = useState<{ [key: string]: { backgroundColor: string } }>({});
 
   const currentLesson = lesson ? lessons.find(l => l.id === lesson) : null;
 
@@ -157,6 +161,45 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
       return lessons[currentIndex + 1];
     }
     return null;
+  };
+
+  const analyzeMoves = () => {
+    if (game.isGameOver()) {
+      setFeedback("Game is over!");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setShowBestMoves(true);
+    
+    setTimeout(() => {
+      const analysis = analyzeBestMoves(game, 3);
+      setBestMoves(analysis);
+      
+      // Highlight best move squares
+      if (analysis.length > 0) {
+        const highlights: { [key: string]: { backgroundColor: string } } = {};
+        analysis.forEach((move, index) => {
+          const colors = [
+            'rgba(34, 197, 94, 0.5)',    // Green for best
+            'rgba(59, 130, 246, 0.5)',   // Blue for second
+            'rgba(168, 85, 247, 0.5)',   // Purple for third
+            'rgba(251, 146, 60, 0.4)',   // Orange for fourth
+            'rgba(234, 179, 8, 0.4)',    // Yellow for fifth
+          ];
+          highlights[move.to] = { backgroundColor: colors[index] };
+        });
+        setHighlightedSquares(highlights);
+      }
+      
+      setIsAnalyzing(false);
+    }, 300);
+  };
+
+  const closeBestMoves = () => {
+    setShowBestMoves(false);
+    setBestMoves([]);
+    setHighlightedSquares({});
   };
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
@@ -305,6 +348,7 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
             }}
             customDarkSquareStyle={{ backgroundColor: '#6366f1' }}
             customLightSquareStyle={{ backgroundColor: '#e0e7ff' }}
+            customSquareStyles={highlightedSquares}
           />
         </div>
 
@@ -332,7 +376,7 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
 
         {/* Controls */}
         <div className="p-4 md:px-6 md:pb-6 border-t border-slate-200 dark:border-slate-800">
-          <div className="flex gap-3">
+          <div className="flex gap-3 mb-3">
             <button
               onClick={resetBoard}
               title="Reset board (Press R)"
@@ -363,8 +407,85 @@ export default function ChessBoard({ lesson, onMoveUpdate, onLessonComplete, onS
               </button>
             )}
           </div>
+          
+          {/* Best Moves Button */}
+          <button
+            onClick={showBestMoves ? closeBestMoves : analyzeMoves}
+            disabled={isAnalyzing || game.isGameOver()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isAnalyzing ? (
+              <>
+                <Sparkles className="w-4 h-4 animate-spin" />
+                <span>Analyzing...</span>
+              </>
+            ) : showBestMoves ? (
+              <>
+                <span>Hide Analysis</span>
+              </>
+            ) : (
+              <>
+                <TrendingUp className="w-4 h-4" />
+                <span>Show Best Moves</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Best Moves Analysis Panel */}
+      {showBestMoves && bestMoves.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-slide-up">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5" />
+              <h3 className="font-semibold text-lg">Best Moves Analysis</h3>
+            </div>
+            <p className="text-sm text-purple-100 mt-1">Squares highlighted on board • Top 5 recommendations</p>
+          </div>
+          
+          <div className="p-4 space-y-2">
+            {bestMoves.map((move, index) => {
+              const colors = [
+                { bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800', text: 'text-green-700 dark:text-green-300', badge: 'bg-green-500' },
+                { bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-500' },
+                { bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-200 dark:border-purple-800', text: 'text-purple-700 dark:text-purple-300', badge: 'bg-purple-500' },
+                { bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800', text: 'text-orange-700 dark:text-orange-300', badge: 'bg-orange-500' },
+                { bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800', text: 'text-yellow-700 dark:text-yellow-300', badge: 'bg-yellow-500' },
+              ];
+              const color = colors[index];
+              
+              return (
+                <div key={index} className={`${color.bg} border ${color.border} rounded-lg p-3`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`${color.badge} text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`font-bold text-lg ${color.text}`}>{move.move}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${color.badge} text-white font-medium`}>
+                          {move.evaluation}
+                        </span>
+                      </div>
+                      <p className={`text-sm ${color.text}`}>{move.reason}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        From {move.from} to {move.to} • Score: {move.score > 0 ? '+' : ''}{move.score}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 text-center">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              💡 Squares are highlighted on the board with matching colors
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Position info */}
       {game.isCheckmate() && (

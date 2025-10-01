@@ -208,3 +208,104 @@ export function getDifficultyDescription(difficulty: 'easy' | 'medium' | 'hard' 
   return descriptions[difficulty];
 }
 
+// Move analysis interface
+export interface MoveAnalysis {
+  move: string;
+  from: string;
+  to: string;
+  score: number;
+  evaluation: string;
+  reason: string;
+}
+
+// Analyze and get best moves
+export function analyzeBestMoves(game: Chess, depth: number = 3): MoveAnalysis[] {
+  const moves = game.moves({ verbose: true });
+  
+  if (moves.length === 0) return [];
+
+  const isMaximizing = game.turn() === 'w';
+  const moveAnalyses: MoveAnalysis[] = [];
+
+  for (const move of moves) {
+    game.move(move.san);
+    const score = minimax(game, depth - 1, -Infinity, Infinity, !isMaximizing);
+    game.undo();
+
+    // Generate reason for the move
+    let reason = '';
+    let evaluation = '';
+    
+    const absScore = Math.abs(score);
+    
+    if (absScore > 900) {
+      evaluation = 'Excellent';
+      reason = move.captured ? `Wins ${getPieceName(move.captured)}` : 'Strong attacking move';
+    } else if (absScore > 500) {
+      evaluation = 'Very Good';
+      reason = move.captured ? `Captures ${getPieceName(move.captured)}` : 'Improves position significantly';
+    } else if (absScore > 200) {
+      evaluation = 'Good';
+      reason = 'Solid positional move';
+    } else if (absScore > 0) {
+      evaluation = 'Decent';
+      reason = 'Maintains balance';
+    } else {
+      evaluation = 'Neutral';
+      reason = 'Safe option';
+    }
+
+    // Add context for special moves
+    if (move.flags.includes('k') || move.flags.includes('q')) {
+      reason = 'Castling - improves king safety';
+      evaluation = 'Good';
+    } else if (move.flags.includes('e')) {
+      reason = 'En passant capture';
+      evaluation = 'Good';
+    } else if (move.flags.includes('p')) {
+      reason = 'Pawn promotion to Queen';
+      evaluation = 'Excellent';
+    }
+
+    // Add attacking context
+    const gameCopy = new Chess(game.fen());
+    gameCopy.move(move.san);
+    if (gameCopy.isCheck()) {
+      reason = 'Puts opponent in check!';
+      evaluation = 'Very Good';
+    }
+    if (gameCopy.isCheckmate()) {
+      reason = 'Checkmate!';
+      evaluation = 'Winning';
+    }
+
+    moveAnalyses.push({
+      move: move.san,
+      from: move.from,
+      to: move.to,
+      score: score,
+      evaluation: evaluation,
+      reason: reason,
+    });
+  }
+
+  // Sort by score (descending for white, ascending for black)
+  moveAnalyses.sort((a, b) => isMaximizing ? b.score - a.score : a.score - b.score);
+
+  // Return top 5 moves
+  return moveAnalyses.slice(0, 5);
+}
+
+// Helper to get piece name
+function getPieceName(pieceType: string): string {
+  const names: { [key: string]: string } = {
+    p: 'Pawn',
+    n: 'Knight',
+    b: 'Bishop',
+    r: 'Rook',
+    q: 'Queen',
+    k: 'King',
+  };
+  return names[pieceType] || 'piece';
+}
+
