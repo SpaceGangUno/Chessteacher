@@ -30,6 +30,7 @@ export default function Home() {
               <ChessBoard 
                 lesson={selectedLesson}
                 onMoveUpdate={setMoveHistory}
+                onSelectLesson={setSelectedLesson}
               />
             </div>
           </div>
