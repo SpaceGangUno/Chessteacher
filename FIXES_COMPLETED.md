@@ -31,6 +31,15 @@
 
 ## 🚀 **MAJOR IMPROVEMENTS ADDED**
 
+### Chess AI Opponent 🆕
+- ✅ **Play vs Computer** in Free Play Mode
+- ✅ **4 Difficulty Levels:** Easy, Medium, Hard, Expert
+- ✅ **Smart AI** using minimax algorithm with alpha-beta pruning
+- ✅ **Adjustable difficulty slider** - change anytime
+- ✅ **AI thinking indicator** - see when computer is calculating
+- ✅ **Automatic responses** - AI plays black pieces
+- ✅ **Position evaluation** - understands piece value and placement
+
 ### Smart Lesson System
 - ✅ **Auto-play opponent moves** - Computer plays its moves automatically
 - ✅ **Turn indicators** - See whose turn it is with color-coded badges

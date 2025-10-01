@@ -43,6 +43,12 @@
 - Finish all steps in the lesson
 - Click "Next Lesson" to continue learning
 
+### **6. Free Play vs AI**
+- Don't select a lesson to enter Free Play Mode
+- Adjust difficulty slider (Easy → Expert)
+- Play against smart AI opponent
+- AI plays black pieces automatically
+
 ---
 
 ## ⌨️ **Keyboard Shortcuts**
@@ -93,12 +99,14 @@
 
 ## 🔥 **New Features Added**
 
+- ✅ **AI Chess Opponent** - Play against computer in free play mode!
+- ✅ **Difficulty Slider** - Choose from Easy, Medium, Hard, or Expert
 - ✅ Auto-play opponent moves
 - ✅ Turn indicators  
 - ✅ Progress tracking
 - ✅ Keyboard shortcuts
 - ✅ Next Lesson navigation
-- ✅ Free Play Mode
+- ✅ Free Play Mode with AI
 - ✅ Board orientation
 - ✅ Mobile responsive
 - ✅ Interactive Learning guide
