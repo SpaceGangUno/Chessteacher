@@ -328,38 +328,27 @@ export const lessons: Lesson[] = [
   {
     id: 'smothered-mate',
     title: "Smothered Mate",
-    description: "Learn this beautiful checkmate pattern with the knight",
+    description: "Learn the classic queen sacrifice that leads to a smothered mate with the knight",
     category: 'tactics',
     difficulty: 'Advanced',
-    startPosition: '5rk1/5ppp/8/8/8/8/5PPP/4RNK1 w - - 0 1',
+    startPosition: '5rrk/7p/5P2/4N3/6Q1/8/5PPP/4R1K1 w - - 0 1',
     steps: [
       {
-        move: 'Nf3',
-        hint: "Position your knight",
-        explanation: "The knight prepares for the final blow"
+        move: 'Qxg8+',
+        hint: "Sacrifice your queen to remove the defender",
+        explanation: "The queen sacrifice drags the rook off the back rank and opens the mating net."
       },
       {
-        move: 'Kg8',
-        hint: "Black's king is trapped",
-        explanation: "The king has nowhere to go"
-      },
-      {
-        move: 'Nh4',
-        hint: "Move the knight closer",
-        explanation: "Getting into position"
-      },
-      {
-        move: 'Kh8',
-        hint: "King is driven to the corner",
-        explanation: "The trap is set"
+        move: 'Rxg8',
+        hint: "Black has to recapture",
+        explanation: "The rook is forced to recapture on g8, leaving the king boxed in by its own pieces."
       },
       {
         move: 'Nf7#',
         hint: "Deliver the smothered mate!",
-        explanation: "Checkmate! The king is smothered by its own pieces and cannot escape the knight."
+        explanation: "Checkmate! The knight jumps to f7 and the king is smothered with no escape squares."
       }
     ]
   }
 ];
-
 
